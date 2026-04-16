@@ -4,7 +4,7 @@ const OLLAMA_URL  = process.env.OLLAMA_URL  || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 
 const HF_TOKEN = process.env.HUGGINGFACE_TOKEN || '';
-const HF_MODEL = process.env.HUGGINGFACE_MODEL || 'mistralai/Mistral-7B-Instruct-v0.3';
+const HF_MODEL = process.env.HUGGINGFACE_MODEL || 'HuggingFaceH4/zephyr-7b-beta';
 
 /**
  * Builds the shared system + user prompts used by all LLM backends.
@@ -99,13 +99,13 @@ async function callOllama(systemPrompt, userPrompt) {
 
 /**
  * Tier 2: Hugging Face Inference API (free serverless).
- * Uses Mistral-7B-Instruct format: <s>[INST] system + user [/INST]
+ * Uses Zephyr chat format: <|system|>...<|user|>...<|assistant|>
  */
 async function callHuggingFace(systemPrompt, userPrompt) {
   if (!HF_TOKEN) throw new Error('HUGGINGFACE_TOKEN not set');
 
-  // Mistral instruct prompt format
-  const prompt = `<s>[INST] ${systemPrompt}\n\n${userPrompt} [/INST]`;
+  // Zephyr instruct prompt format
+  const prompt = `<|system|>\n${systemPrompt}</s>\n<|user|>\n${userPrompt}</s>\n<|assistant|>\n`;
 
   const response = await axios.post(
     `https://api-inference.huggingface.co/models/${HF_MODEL}`,

@@ -57,8 +57,19 @@ function rankTrials(trials, queryTerms, topN = 6) {
   const statusBoost = { RECRUITING: 0.2, 'ACTIVE, NOT RECRUITING': 0.1, COMPLETED: 0.05 };
 
   const scored = unique.map((t) => {
-    const text = `${t.title} ${t.summary} ${t.conditions}`.toLowerCase();
-    const rel = keywordRelevance(text, queryTerms);
+    const titleText = t.title.toLowerCase();
+    const bodyText = `${t.summary} ${t.conditions}`.toLowerCase();
+
+    const titleRel = keywordRelevance(titleText, queryTerms);
+    const bodyRel = keywordRelevance(bodyText, queryTerms);
+
+    // Title match is weighted 3× — trials that only mention query terms
+    // incidentally in a long summary (e.g. "lung" in a breast cancer trial)
+    // won't outscore trials that are actually about the condition.
+    const rel = titleRel > 0
+      ? (titleRel * 3 + bodyRel) / 4
+      : bodyRel * 0.25;
+
     const boost = statusBoost[(t.status || '').toUpperCase()] || 0;
     return { ...t, _score: rel + boost };
   });
