@@ -1,19 +1,15 @@
 const axios = require('axios');
 
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+const OLLAMA_URL  = process.env.OLLAMA_URL  || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 
+const HF_TOKEN = process.env.HUGGINGFACE_TOKEN || '';
+const HF_MODEL = process.env.HUGGINGFACE_MODEL || 'mistralai/Mistral-7B-Instruct-v0.3';
+
 /**
- * Calls Ollama to synthesize a structured medical research response.
- *
- * @param {string}   userMessage      - current user query
- * @param {object[]} publications     - top-ranked publications
- * @param {object[]} trials           - top-ranked clinical trials
- * @param {object[]} history          - last N conversation turns [{role, content}]
- * @param {object}   context          - { disease, patientName, location }
- * @returns {Promise<string>}         - the assistant's response text
+ * Builds the shared system + user prompts used by all LLM backends.
  */
-async function synthesize(userMessage, publications, trials, history = [], context = {}) {
+function buildPrompts(userMessage, publications, trials, history, context) {
   const { disease = '', patientName = '', location = '' } = context;
 
   const pubContext = publications
@@ -39,7 +35,7 @@ URL: ${t.url}`
     .join('\n\n');
 
   const historyText = history
-    .slice(-6) // last 3 turns (user + assistant pairs)
+    .slice(-6)
     .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.substring(0, 400)}`)
     .join('\n');
 
@@ -79,31 +75,104 @@ Based on the above research, provide a comprehensive, structured response with t
 ## Disclaimer
 (One line: for informational purposes only, not medical advice)`;
 
-  try {
-    const response = await axios.post(
-      `${OLLAMA_URL}/api/generate`,
-      {
-        model: OLLAMA_MODEL,
-        prompt: `${systemPrompt}\n\n${userPrompt}`,
-        stream: false,
-        options: {
-          temperature: 0.2,
-          num_predict: 1500,
-          top_p: 0.9,
-        },
-      },
-      { timeout: 120000 } // LLM can take time
-    );
-
-    return response.data.response || 'Unable to generate a response at this time.';
-  } catch (err) {
-    console.error('LLM synthesis error:', err.message);
-    return generateFallbackResponse(userMessage, publications, trials, disease);
-  }
+  return { systemPrompt, userPrompt };
 }
 
 /**
- * Simple fallback when Ollama is unreachable — structured text built from raw data.
+ * Tier 1: Ollama (local).
+ */
+async function callOllama(systemPrompt, userPrompt) {
+  const response = await axios.post(
+    `${OLLAMA_URL}/api/generate`,
+    {
+      model: OLLAMA_MODEL,
+      prompt: `${systemPrompt}\n\n${userPrompt}`,
+      stream: false,
+      options: { temperature: 0.2, num_predict: 1500, top_p: 0.9 },
+    },
+    { timeout: 120000 }
+  );
+  const text = response.data.response || '';
+  if (!text.trim()) throw new Error('Ollama returned empty response');
+  return text;
+}
+
+/**
+ * Tier 2: Hugging Face Inference API (free serverless).
+ * Uses Mistral-7B-Instruct format: <s>[INST] system + user [/INST]
+ */
+async function callHuggingFace(systemPrompt, userPrompt) {
+  if (!HF_TOKEN) throw new Error('HUGGINGFACE_TOKEN not set');
+
+  // Mistral instruct prompt format
+  const prompt = `<s>[INST] ${systemPrompt}\n\n${userPrompt} [/INST]`;
+
+  const response = await axios.post(
+    `https://api-inference.huggingface.co/models/${HF_MODEL}`,
+    {
+      inputs: prompt,
+      parameters: {
+        max_new_tokens: 1200,
+        temperature: 0.2,
+        return_full_text: false,
+        do_sample: true,
+      },
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${HF_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 90000,
+    }
+  );
+
+  // HF returns [{generated_text: "..."}]
+  const text = response.data?.[0]?.generated_text || '';
+  if (!text.trim()) throw new Error('HuggingFace returned empty response');
+  return text;
+}
+
+/**
+ * Main entry point.
+ * Priority: Ollama → HuggingFace → static fallback
+ *
+ * @param {string}   userMessage
+ * @param {object[]} publications
+ * @param {object[]} trials
+ * @param {object[]} history
+ * @param {object}   context      - { disease, patientName, location }
+ * @returns {Promise<string>}
+ */
+async function synthesize(userMessage, publications, trials, history = [], context = {}) {
+  const { systemPrompt, userPrompt } = buildPrompts(userMessage, publications, trials, history, context);
+
+  // ── Tier 1: Ollama ─────────────────────────────────────────────────────────
+  try {
+    const text = await callOllama(systemPrompt, userPrompt);
+    console.log('[llm] Response from Ollama');
+    return text;
+  } catch (err) {
+    console.warn('[llm] Ollama unavailable:', err.message);
+  }
+
+  // ── Tier 2: HuggingFace ────────────────────────────────────────────────────
+  try {
+    const text = await callHuggingFace(systemPrompt, userPrompt);
+    console.log('[llm] Response from HuggingFace');
+    return text;
+  } catch (err) {
+    console.warn('[llm] HuggingFace unavailable:', err.message);
+  }
+
+  // ── Tier 3: Static fallback ────────────────────────────────────────────────
+  console.warn('[llm] Using static fallback response');
+  return generateFallbackResponse(userMessage, publications, trials, context.disease);
+}
+
+/**
+ * Static fallback — structured response built directly from ranked data.
+ * Used only when both Ollama and HuggingFace are unreachable.
  */
 function generateFallbackResponse(query, publications, trials, disease) {
   const pubList = publications
