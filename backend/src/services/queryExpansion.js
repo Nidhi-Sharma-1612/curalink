@@ -57,12 +57,23 @@ Output:`;
     return expanded;
   } catch (err) {
     console.warn('Query expansion failed, using fallback:', err.message);
-    // Fallback: simple variations
-    const base = disease ? `${query} ${disease}` : query;
+    // Extract meaningful keywords by removing filler words
+    const stopWords = new Set([
+      'latest', 'recent', 'new', 'top', 'best', 'what', 'how', 'for',
+      'the', 'and', 'or', 'in', 'of', 'a', 'an', 'is', 'are', 'with',
+      'about', 'give', 'show', 'find', 'tell', 'me',
+    ]);
+    const keywords = query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !stopWords.has(w));
+    const keyQuery = keywords.join(' ') || query;
+    const d = disease || '';
+
     return [
-      base,
-      disease ? `${disease} treatment ${query}` : `treatment ${query}`,
-      disease ? `${disease} clinical research ${query}` : `clinical research ${query}`,
+      d ? `${d} ${keyQuery}`.trim() : keyQuery,
+      d ? `${d} treatment therapy` : `${keyQuery} treatment therapy`,
+      d ? `${d} clinical trials` : `${keyQuery} clinical trials`,
     ];
   }
 }

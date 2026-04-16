@@ -74,9 +74,11 @@ router.post('/chat', async (req, res) => {
       fetchOpenAlex(q, 100),
     ]);
     // Clinical trials fetched once per condition (avoid duplicate NCT IDs from same endpoint)
+    // Pass effectiveDisease as the condition (disease name) and the query text as the term.
+    // When no disease is set, condition is empty and ClinicalTrials uses query.term only.
     retrievalJobs.push(
-      fetchClinicalTrials(effectiveDisease || message, expandedQueries[0], effectiveLocation, 50),
-      fetchClinicalTrials(effectiveDisease || message, expandedQueries[1] || message, effectiveLocation, 50),
+      fetchClinicalTrials(effectiveDisease, message, effectiveLocation, 50),
+      fetchClinicalTrials(effectiveDisease, expandedQueries[0] || message, effectiveLocation, 50),
     );
 
     const settled = await Promise.allSettled(retrievalJobs);

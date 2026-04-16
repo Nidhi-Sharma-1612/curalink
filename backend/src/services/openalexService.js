@@ -26,7 +26,7 @@ async function fetchOpenAlex(query, limit = 100) {
           filter: 'from_publication_date:2015-01-01',
         },
         headers: { 'User-Agent': 'Curalink/1.0 (mailto:curalink@example.com)' },
-        timeout: 15000,
+        timeout: 30000,
       });
 
       const works = res.data?.results || [];

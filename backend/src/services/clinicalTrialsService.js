@@ -14,11 +14,19 @@ const BASE = 'https://clinicaltrials.gov/api/v2/studies';
 async function fetchClinicalTrials(condition, query = '', location = '', limit = 50) {
   try {
     const params = {
-      'query.cond': condition || query,
-      'query.term': query || undefined,
       pageSize: Math.min(limit, 100),
       format: 'json',
     };
+
+    // query.cond is for disease/condition names (e.g. "lung cancer") — not full sentences.
+    // query.term is a general keyword search — use it when condition is absent.
+    if (condition) {
+      params['query.cond'] = condition;
+    }
+    if (query) {
+      params['query.term'] = query;
+    }
+    if (!condition && !query) return [];
 
     if (location) {
       params['query.locn'] = location;
