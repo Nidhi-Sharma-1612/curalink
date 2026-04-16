@@ -24,7 +24,7 @@ async function fetchClinicalTrials(condition, query = '', location = '', limit =
       params['query.locn'] = location;
     }
 
-    const res = await axios.get(BASE, { params, timeout: 15000 });
+    const res = await axios.get(BASE, { params, timeout: 30000 });
     const studies = res.data?.studies || [];
 
     return studies.map((s) => {

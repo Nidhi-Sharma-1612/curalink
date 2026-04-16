@@ -4,6 +4,14 @@ const xml2js = require('xml2js');
 const ESEARCH = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi';
 const EFETCH = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi';
 
+// NCBI requires tool + email for production requests to avoid rate limiting.
+// API key is optional but raises limit from 3 req/s to 10 req/s (free at https://www.ncbi.nlm.nih.gov/account/)
+const NCBI_BASE_PARAMS = {
+  tool: 'curalink',
+  email: process.env.NCBI_EMAIL || 'curalink@example.com',
+  ...(process.env.NCBI_API_KEY ? { api_key: process.env.NCBI_API_KEY } : {}),
+};
+
 /**
  * Fetches up to `limit` PubMed articles for a given query.
  * Performs esearch (get IDs) then efetch (get full XML).
@@ -17,13 +25,14 @@ async function fetchPubMed(query, limit = 100) {
     // Step 1 — get IDs
     const searchRes = await axios.get(ESEARCH, {
       params: {
+        ...NCBI_BASE_PARAMS,
         db: 'pubmed',
         term: query,
         retmax: limit,
         sort: 'pub date',
         retmode: 'json',
       },
-      timeout: 15000,
+      timeout: 30000,
     });
 
     const ids = searchRes.data?.esearchresult?.idlist || [];
@@ -32,8 +41,8 @@ async function fetchPubMed(query, limit = 100) {
     // Step 2 — fetch details (batch in groups of 100)
     const batchIds = ids.slice(0, 100).join(',');
     const fetchRes = await axios.get(EFETCH, {
-      params: { db: 'pubmed', id: batchIds, retmode: 'xml' },
-      timeout: 20000,
+      params: { ...NCBI_BASE_PARAMS, db: 'pubmed', id: batchIds, retmode: 'xml' },
+      timeout: 40000,
     });
 
     const parsed = await xml2js.parseStringPromise(fetchRes.data, {
