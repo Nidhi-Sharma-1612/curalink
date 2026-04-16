@@ -4,7 +4,7 @@ const OLLAMA_URL  = process.env.OLLAMA_URL  || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 
 const HF_TOKEN = process.env.HUGGINGFACE_TOKEN || '';
-const HF_MODEL = process.env.HUGGINGFACE_MODEL || 'HuggingFaceH4/zephyr-7b-beta';
+const HF_MODEL = process.env.HUGGINGFACE_MODEL || 'google/gemma-4-E4B-it';
 
 /**
  * Builds the shared system + user prompts used by all LLM backends.
@@ -99,24 +99,21 @@ async function callOllama(systemPrompt, userPrompt) {
 
 /**
  * Tier 2: Hugging Face Inference API (free serverless).
- * Uses Zephyr chat format: <|system|>...<|user|>...<|assistant|>
+ * Uses OpenAI-compatible chat completions endpoint (required for Gemma 4 and other modern models).
  */
 async function callHuggingFace(systemPrompt, userPrompt) {
   if (!HF_TOKEN) throw new Error('HUGGINGFACE_TOKEN not set');
 
-  // Zephyr instruct prompt format
-  const prompt = `<|system|>\n${systemPrompt}</s>\n<|user|>\n${userPrompt}</s>\n<|assistant|>\n`;
-
   const response = await axios.post(
-    `https://api-inference.huggingface.co/models/${HF_MODEL}`,
+    `https://api-inference.huggingface.co/models/${HF_MODEL}/v1/chat/completions`,
     {
-      inputs: prompt,
-      parameters: {
-        max_new_tokens: 1200,
-        temperature: 0.2,
-        return_full_text: false,
-        do_sample: true,
-      },
+      model: HF_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 1200,
+      temperature: 0.2,
     },
     {
       headers: {
@@ -127,8 +124,8 @@ async function callHuggingFace(systemPrompt, userPrompt) {
     }
   );
 
-  // HF returns [{generated_text: "..."}]
-  const text = response.data?.[0]?.generated_text || '';
+  // Chat completions format: choices[0].message.content
+  const text = response.data?.choices?.[0]?.message?.content || '';
   if (!text.trim()) throw new Error('HuggingFace returned empty response');
   return text;
 }
