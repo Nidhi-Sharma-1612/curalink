@@ -1,30 +1,33 @@
 # Curalink — AI Medical Research Assistant
 
-A full-stack MERN application that acts as a health research companion. It understands user context, retrieves high-quality medical research from multiple sources, reasons over it using a local open-source LLM, and delivers structured, personalized, source-backed answers.
+A full-stack MERN application that accepts a medical query, retrieves real research from PubMed, OpenAlex, and ClinicalTrials.gov, re-ranks results, and synthesizes a structured, source-attributed response using an LLM.
+
+**Live demo:** [curalink-flax.vercel.app](https://curalink-flax.vercel.app)
 
 ---
 
 ## Features
 
-- **Structured + Natural Language Input** — toggle between a form (patient name, disease, location, query) and free-text chat
-- **Multi-source Retrieval** — fetches from PubMed, OpenAlex, and ClinicalTrials.gov in parallel
-- **Query Expansion** — Ollama LLM generates 3 diverse search variants from every query for broader coverage
-- **Intelligent Re-ranking** — composite scoring: `0.5 × keyword relevance + 0.3 × recency + 0.2 × citations`
-- **LLM Synthesis** — structured response with Condition Overview, Research Insights, Clinical Trials, Source Attribution
-- **Multi-turn Context** — conversation history and patient context persist across follow-up questions
-- **Fallback Mode** — if Ollama is offline, a structured response is built directly from ranked results
+- Multi-source retrieval — PubMed, OpenAlex, ClinicalTrials.gov queried in parallel
+- Query expansion via LLM — 3 search variants generated from the user's input
+- Composite re-ranking — relevance + recency + citation count
+- Structured LLM response — Condition Overview, Research Insights, Clinical Trials, Source Attribution, Disclaimer
+- Multi-turn conversation — session history stored in MongoDB Atlas, persists across page refreshes
+- Two input modes — Natural Language and Structured (patient name, disease, location)
+- 3-tier LLM fallback — Ollama (local) → HuggingFace Inference API → static structured response
 
 ---
 
 ## Tech Stack
 
-| Layer    | Technology                                   |
-| -------- | -------------------------------------------- |
-| Frontend | React 19 + Vite                              |
-| Backend  | Node.js + Express 5                          |
-| Database | MongoDB Atlas (Mongoose)                     |
-| LLM      | Ollama (llama3) — local, open-source         |
-| APIs     | PubMed NCBI, OpenAlex, ClinicalTrials.gov v2 |
+| Layer            | Technology                                                 |
+| ---------------- | ---------------------------------------------------------- |
+| Frontend         | React 19, Vite 8, react-markdown, axios                    |
+| Backend          | Node.js, Express 5, Mongoose                               |
+| Database         | MongoDB Atlas                                              |
+| LLM (local)      | Ollama — llama3 / mistral                                  |
+| LLM (production) | HuggingFace Inference API — Mistral-7B-Instruct            |
+| Research APIs    | PubMed (NCBI E-utilities), OpenAlex, ClinicalTrials.gov v2 |
 
 ---
 
@@ -34,120 +37,35 @@ A full-stack MERN application that acts as a health research companion. It under
 curalink/
 ├── backend/
 │   ├── src/
-│   │   ├── routes/chat.js              # POST /api/chat, GET/DELETE /api/sessions/:id
+│   │   ├── routes/
+│   │   │   └── chat.js                   # POST /api/chat, GET /api/sessions/:id
 │   │   ├── services/
-│   │   │   ├── queryExpansion.js       # Ollama-based query expansion (3 variants)
-│   │   │   ├── pubmedService.js        # PubMed esearch + efetch pipeline
-│   │   │   ├── openalexService.js      # OpenAlex /works with abstract reconstruction
-│   │   │   ├── clinicalTrialsService.js# ClinicalTrials.gov v2 API
-│   │   │   ├── rankingService.js       # Composite re-ranking + deduplication
-│   │   │   └── llmService.js           # Ollama synthesis + fallback response
-│   │   ├── models/Session.js           # Mongoose session schema
-│   │   └── app.js                      # Express setup + MongoDB connect
+│   │   │   ├── queryExpansion.js         # LLM-based query expansion (3 variants)
+│   │   │   ├── pubmedService.js          # PubMed esearch + efetch (XML parse)
+│   │   │   ├── openalexService.js        # OpenAlex /works with pagination
+│   │   │   ├── clinicalTrialsService.js  # ClinicalTrials.gov v2 API
+│   │   │   ├── rankingService.js         # Composite score re-ranking
+│   │   │   └── llmService.js             # Ollama → HuggingFace → static fallback
+│   │   ├── models/
+│   │   │   └── Session.js                # Mongoose model — sessionId, messages[]
+│   │   └── app.js                        # Express setup, CORS, MongoDB connect
 │   ├── .env.example
 │   └── package.json
-└── frontend/
-    ├── src/
-    │   ├── components/
-    │   │   ├── ChatWindow.jsx
-    │   │   ├── InputPanel.jsx
-    │   │   ├── MessageBubble.jsx
-    │   │   ├── ResearchCard.jsx
-    │   │   └── TrialCard.jsx
-    │   ├── services/api.js
-    │   ├── App.jsx
-    │   └── index.css
-    └── package.json
-```
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- [Ollama](https://ollama.com) installed and running locally
-- MongoDB Atlas account (free tier is enough)
-
-### 1. Clone the repo
-
-```bash
-git clone https://github.com/<your-username>/curalink.git
-cd curalink
-```
-
-### 2. Backend setup
-
-```bash
-cd backend
-npm install
-cp .env.example .env
-# Edit .env and fill in your MONGODB_URI
-```
-
-Pull the LLM model (one-time):
-
-```bash
-ollama pull llama3
-```
-
-Start the backend:
-
-```bash
-npm run dev   # development (node --watch)
-# or
-npm start     # production
-```
-
-Backend runs on `http://localhost:5000`.
-
-### 3. Frontend setup
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend runs on `http://localhost:5173`. The Vite dev proxy forwards `/api` → `localhost:5000` automatically.
-
----
-
-## Environment Variables
-
-Copy `backend/.env.example` to `backend/.env` and fill in the values:
-
-| Variable       | Description                                       |
-| -------------- | ------------------------------------------------- |
-| `PORT`         | Express server port (default: 5000)               |
-| `MONGODB_URI`  | MongoDB Atlas connection string                   |
-| `OLLAMA_URL`   | Ollama base URL (default: http://localhost:11434) |
-| `OLLAMA_MODEL` | Ollama model name (default: llama3)               |
-
-For the frontend in production, set `VITE_API_URL` to your deployed backend URL.
-
----
-
-## API Endpoints
-
-| Method   | Path                | Description                                    |
-| -------- | ------------------- | ---------------------------------------------- |
-| `POST`   | `/api/chat`         | Send a message, get a research-backed response |
-| `GET`    | `/api/sessions/:id` | Retrieve full conversation history             |
-| `DELETE` | `/api/sessions/:id` | Clear a session                                |
-| `GET`    | `/health`           | Health check                                   |
-
-### POST /api/chat — Request body
-
-```json
-{
-  "sessionId": "optional-existing-session-id",
-  "message": "Latest treatment for lung cancer",
-  "disease": "lung cancer",
-  "patientName": "John Smith",
-  "location": "Toronto, Canada"
-}
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── ChatWindow.jsx            # Scrollable message list
+│   │   │   ├── InputPanel.jsx            # Query form (natural + structured mode)
+│   │   │   ├── MessageBubble.jsx         # Message renderer with collapsible cards
+│   │   │   ├── ResearchCard.jsx          # Publication card
+│   │   │   └── TrialCard.jsx             # Clinical trial card
+│   │   ├── services/
+│   │   │   └── api.js                    # Axios wrapper for backend
+│   │   ├── App.jsx                       # Root — session management, layout
+│   │   └── index.css                     # Global CSS variables (dark theme)
+│   └── package.json
+├── .gitignore
+└── README.md
 ```
 
 ---
@@ -158,49 +76,192 @@ For the frontend in production, set `VITE_API_URL` to your deployed backend URL.
 User Input
     │
     ▼
-[1] Query Expansion (Ollama)
-    Generates 3 diverse search strings from the user query + disease context
+[1] Query Expansion (LLM)
+    → 3 expanded search strings from the disease + query
     │
     ▼
-[2] Parallel Retrieval (Promise.allSettled)
-    ├── PubMed    → up to 100 results × 3 queries = 300 candidates
-    ├── OpenAlex  → up to 100 results × 3 queries = 300 candidates
-    └── ClinicalTrials.gov → up to 50 trials × 2 queries = 100 candidates
+[2] Parallel Data Retrieval
+    ├── PubMed         → up to 100 articles  (esearch → efetch XML)
+    ├── OpenAlex       → up to 100 papers    (relevance_score:desc)
+    └── ClinicalTrials → up to 50 trials
     │
     ▼
 [3] Merge + Deduplicate
-    Title-based dedup for publications, nctId-based for trials
     │
     ▼
 [4] Re-Ranking
-    score = 0.5 × keyword_relevance + 0.3 × recency + 0.2 × citations
+    Score = 0.5 × keyword_relevance + 0.3 × recency + 0.2 × citations
     → Top 8 publications + Top 6 trials
     │
     ▼
-[5] LLM Synthesis (Ollama llama3)
-    Structured response with citations, or fallback if Ollama offline
+[5] LLM Synthesis
+    Tier 1: Ollama (local)
+    Tier 2: HuggingFace Mistral-7B (production)
+    Tier 3: Static structured fallback
     │
     ▼
-[6] Persist to MongoDB (session history)
+[6] Store in MongoDB (session history)
     │
     ▼
-[7] Return to React frontend
+[7] Return to React Frontend
 ```
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- MongoDB Atlas account (free tier)
+- Ollama installed locally (optional — only needed for local LLM)
+
+### 1. Clone & install
+
+```bash
+git clone https://github.com/your-username/curalink.git
+cd curalink
+
+cd backend && npm install
+cd ../frontend && npm install
+```
+
+### 2. Configure backend environment
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Edit `backend/.env`:
+
+```env
+PORT=5000
+MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/curalink
+
+# Ollama (local LLM — optional)
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=llama3
+
+# NCBI / PubMed (mandatory per NCBI policy)
+NCBI_EMAIL=your_email@example.com
+NCBI_API_KEY=your_ncbi_api_key_here
+
+# HuggingFace (production LLM fallback)
+HUGGINGFACE_TOKEN=hf_your_token_here
+HUGGINGFACE_MODEL=mistralai/Mistral-7B-Instruct-v0.3
+```
+
+### 3. Run locally
+
+```bash
+# Terminal 1 — backend
+cd backend && npm run dev
+
+# Terminal 2 — frontend
+cd frontend && npm run dev
+```
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:5000`
+
+The Vite dev server proxies `/api` → `localhost:5000` automatically — no CORS issues in development.
+
+---
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+| Variable            | Required | Description                                                                    |
+| ------------------- | -------- | ------------------------------------------------------------------------------ |
+| `MONGODB_URI`       | Yes      | MongoDB Atlas connection string                                                |
+| `PORT`              | No       | Server port (default: 5000)                                                    |
+| `OLLAMA_URL`        | No       | Ollama base URL (default: `http://localhost:11434`)                            |
+| `OLLAMA_MODEL`      | No       | Ollama model name (default: `llama3`)                                          |
+| `NCBI_EMAIL`        | Yes      | Email for NCBI API identification (mandatory per NCBI policy)                  |
+| `NCBI_API_KEY`      | No       | Raises PubMed rate limit from 3 to 10 req/s (free at ncbi.nlm.nih.gov/account) |
+| `HUGGINGFACE_TOKEN` | Yes\*    | HuggingFace token — required for production LLM                                |
+| `HUGGINGFACE_MODEL` | No       | HF model (default: `mistralai/Mistral-7B-Instruct-v0.3`)                       |
+
+\*Required if Ollama is not running (i.e., in any hosted environment).
+
+### Frontend (`frontend/.env.local`)
+
+| Variable       | Required        | Description                                                |
+| -------------- | --------------- | ---------------------------------------------------------- |
+| `VITE_API_URL` | Production only | Full backend URL, e.g. `https://your-app.onrender.com/api` |
+
+Not needed in development — Vite's proxy handles it.
+
+---
+
+## API Reference
+
+| Method   | Path                | Description                                     |
+| -------- | ------------------- | ----------------------------------------------- |
+| `GET`    | `/health`           | Health check                                    |
+| `POST`   | `/api/chat`         | Send a message, receive LLM response + research |
+| `GET`    | `/api/sessions/:id` | Retrieve full conversation history              |
+| `DELETE` | `/api/sessions/:id` | Delete a session                                |
+
+### POST `/api/chat`
+
+Request:
+
+```json
+{
+  "sessionId": "uuid-string",
+  "message": "Latest treatments for lung cancer",
+  "disease": "lung cancer",
+  "patientName": "Jane Doe",
+  "location": "New York"
+}
+```
+
+Response:
+
+```json
+{
+  "sessionId": "uuid-string",
+  "message": "## Condition Overview\n...",
+  "research": {
+    "publications": [...],
+    "trials": [...],
+    "retrievalStats": {
+      "pubmedFetched": 100,
+      "openalexFetched": 100,
+      "trialsFetched": 50
+    }
+  }
+}
+```
+
+---
+
+## Frontend Components
+
+| Component       | Description                                                                                                                                      |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `InputPanel`    | Toggle between Natural Language and Structured mode (patient name, disease, location). Includes example query chips.                             |
+| `ChatWindow`    | Scrollable message list with auto-scroll and loading indicator.                                                                                  |
+| `MessageBubble` | Renders user bubbles and assistant cards. Assistant cards include retrieval stats, collapsible Publications panel, and collapsible Trials panel. |
+| `ResearchCard`  | Publication card — title, source badge, year, authors, abstract snippet, external link (opens in new tab).                                       |
+| `TrialCard`     | Trial card — title, NCT ID, color-coded status badge, phase, summary, locations, external link.                                                  |
+
+Session ID is stored in `localStorage` and survives page refreshes. Click **+ New Chat** to start a fresh session.
 
 ---
 
 ## Example Queries
 
-- "Latest treatment for lung cancer"
-- "Clinical trials for diabetes"
-- "Top researchers in Alzheimer's disease"
-- "Recent studies on heart disease"
-- "Deep brain stimulation for Parkinson's"
+- `Latest treatment for lung cancer`
+- `Clinical trials for diabetes`
+- `Top researchers in Alzheimer's disease`
+- `Recent studies on heart disease`
+- `Deep brain stimulation for Parkinson's`
 
 ---
 
-## Deployment
+## Disclaimer
 
-- **Backend** → [Render](https://render.com) or [Railway](https://railway.app) (set env vars in dashboard)
-- **Frontend** → [Vercel](https://vercel.com) (set `VITE_API_URL` to backend URL)
-- **Ollama** → Runs locally; for production use a VPS with Ollama or add a Hugging Face Inference API fallback
+Curalink is for research and educational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified healthcare professional for medical decisions.
