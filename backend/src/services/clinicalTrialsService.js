@@ -42,6 +42,7 @@ async function fetchClinicalTrials(condition, query = '', location = '', limit =
       const desc = p.descriptionModule || {};
       const eligibility = p.eligibilityModule || {};
       const contacts = p.contactsLocationsModule || {};
+      const condModule = p.conditionsModule || {};
 
       const nctId = id.nctId || '';
       const locations = (contacts.locations || []).slice(0, 3).map((l) => ({
@@ -67,7 +68,7 @@ async function fetchClinicalTrials(condition, query = '', location = '', limit =
         studyType: p.designModule?.studyType || '',
         startDate: status.startDateStruct?.date || '',
         completionDate: status.completionDateStruct?.date || '',
-        conditions: (id.conditions || []).join(', '),
+        conditions: (condModule.conditions || []).join(', '),
         locations,
         contacts: centralContacts,
         url: `https://clinicaltrials.gov/study/${nctId}`,

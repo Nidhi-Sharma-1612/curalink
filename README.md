@@ -14,7 +14,7 @@ A full-stack MERN application that accepts a medical query, retrieves real resea
 - Structured LLM response — Condition Overview, Research Insights, Clinical Trials, Source Attribution, Disclaimer
 - Multi-turn conversation — session history stored in MongoDB Atlas, persists across page refreshes
 - Two input modes — Natural Language and Structured (patient name, disease, location)
-- 3-tier LLM fallback — Ollama (local) → HuggingFace Inference API → static structured response
+- 3-tier LLM fallback — Ollama (local) → Groq (Llama 3) → static structured response
 
 ---
 
@@ -26,7 +26,7 @@ A full-stack MERN application that accepts a medical query, retrieves real resea
 | Backend          | Node.js, Express 5, Mongoose                               |
 | Database         | MongoDB Atlas                                              |
 | LLM (local)      | Ollama — llama3 / mistral                                  |
-| LLM (production) | HuggingFace Inference API — Mistral-7B-Instruct            |
+| LLM (production) | Groq — Llama 3 8B (free, fast inference)                   |
 | Research APIs    | PubMed (NCBI E-utilities), OpenAlex, ClinicalTrials.gov v2 |
 
 ---
@@ -45,7 +45,7 @@ curalink/
 │   │   │   ├── openalexService.js        # OpenAlex /works with pagination
 │   │   │   ├── clinicalTrialsService.js  # ClinicalTrials.gov v2 API
 │   │   │   ├── rankingService.js         # Composite score re-ranking
-│   │   │   └── llmService.js             # Ollama → HuggingFace → static fallback
+│   │   │   └── llmService.js             # Ollama → Groq → static fallback
 │   │   ├── models/
 │   │   │   └── Session.js                # Mongoose model — sessionId, messages[]
 │   │   └── app.js                        # Express setup, CORS, MongoDB connect
@@ -96,7 +96,7 @@ User Input
     ▼
 [5] LLM Synthesis
     Tier 1: Ollama (local)
-    Tier 2: HuggingFace Mistral-7B (production)
+    Tier 2: Groq — Llama 3 8B (free, fast)
     Tier 3: Static structured fallback
     │
     ▼
@@ -146,9 +146,10 @@ OLLAMA_MODEL=llama3
 NCBI_EMAIL=your_email@example.com
 NCBI_API_KEY=your_ncbi_api_key_here
 
-# HuggingFace (production LLM fallback)
-HUGGINGFACE_TOKEN=hf_your_token_here
-HUGGINGFACE_MODEL=mistralai/Mistral-7B-Instruct-v0.3
+# Groq (production LLM — Tier 2)
+GROQ_API_KEY=gsk_your_groq_key_here
+GROQ_MODEL=llama3-8b-8192
+
 ```
 
 ### 3. Run locally
@@ -180,8 +181,8 @@ The Vite dev server proxies `/api` → `localhost:5000` automatically — no COR
 | `OLLAMA_MODEL`      | No       | Ollama model name (default: `llama3`)                                          |
 | `NCBI_EMAIL`        | Yes      | Email for NCBI API identification (mandatory per NCBI policy)                  |
 | `NCBI_API_KEY`      | No       | Raises PubMed rate limit from 3 to 10 req/s (free at ncbi.nlm.nih.gov/account) |
-| `HUGGINGFACE_TOKEN` | Yes\*    | HuggingFace token — required for production LLM                                |
-| `HUGGINGFACE_MODEL` | No       | HF model (default: `mistralai/Mistral-7B-Instruct-v0.3`)                       |
+| `GROQ_API_KEY`      | Yes\*    | Groq API key — production LLM (free at console.groq.com)                       |
+| `GROQ_MODEL`        | No       | Groq model (default: `llama3-8b-8192`)                                         |
 
 \*Required if Ollama is not running (i.e., in any hosted environment).
 

@@ -94,7 +94,7 @@ router.post('/chat', async (req, res) => {
     // ── 4. Merge + rank ────────────────────────────────────────────────────
     const allPublications = [...pubmed, ...openalex];
     const topPublications = rankPublications(allPublications, queryTerms, 8);
-    const topTrials = rankTrials(trials, queryTerms, 6);
+    const topTrials = rankTrials(trials, queryTerms, 6, effectiveDisease);
 
     console.log(`[chat] After ranking: pubs=${topPublications.length}, trials=${topTrials.length}`);
 

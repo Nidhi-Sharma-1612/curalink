@@ -43,9 +43,10 @@ function rankPublications(publications, queryTerms, topN = 8) {
  * @param {object[]} trials
  * @param {string[]} queryTerms
  * @param {number} topN
+ * @param {string} primaryDisease  - used to penalize off-topic trials via conditions field
  * @returns {object[]}
  */
-function rankTrials(trials, queryTerms, topN = 6) {
+function rankTrials(trials, queryTerms, topN = 6, primaryDisease = '') {
   const seen = new Set();
   const unique = trials.filter((t) => {
     if (seen.has(t.nctId)) return false;
@@ -71,7 +72,19 @@ function rankTrials(trials, queryTerms, topN = 6) {
       : bodyRel * 0.25;
 
     const boost = statusBoost[(t.status || '').toUpperCase()] || 0;
-    return { ...t, _score: rel + boost };
+
+    // If the trial has conditions populated, require all primary disease words
+    // to appear in conditions — otherwise apply a 0.25× penalty to push
+    // off-topic trials (e.g. breast cancer in a lung cancer query) to the bottom.
+    let conditionPenalty = 1.0;
+    if (primaryDisease && t.conditions && t.conditions.length > 0) {
+      const condText = t.conditions.toLowerCase();
+      const diseaseWords = primaryDisease.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+      const allMatch = diseaseWords.length > 0 && diseaseWords.every((w) => condText.includes(w));
+      if (!allMatch) conditionPenalty = 0.25;
+    }
+
+    return { ...t, _score: (rel + boost) * conditionPenalty };
   });
 
   scored.sort((a, b) => b._score - a._score);

@@ -3,8 +3,8 @@ const axios = require('axios');
 const OLLAMA_URL  = process.env.OLLAMA_URL  || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 
-const HF_TOKEN = process.env.HUGGINGFACE_TOKEN || '';
-const HF_MODEL = process.env.HUGGINGFACE_MODEL || 'google/gemma-4-E4B-it';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_MODEL   = process.env.GROQ_MODEL   || 'llama3-8b-8192';
 
 /**
  * Builds the shared system + user prompts used by all LLM backends.
@@ -98,16 +98,15 @@ async function callOllama(systemPrompt, userPrompt) {
 }
 
 /**
- * Tier 2: Hugging Face Inference API (free serverless).
- * Uses OpenAI-compatible chat completions endpoint (required for Gemma 4 and other modern models).
+ * Tier 2: Groq (free, fast, OpenAI-compatible — Llama 3).
  */
-async function callHuggingFace(systemPrompt, userPrompt) {
-  if (!HF_TOKEN) throw new Error('HUGGINGFACE_TOKEN not set');
+async function callGroq(systemPrompt, userPrompt) {
+  if (!GROQ_API_KEY) throw new Error('GROQ_API_KEY not set');
 
   const response = await axios.post(
-    `https://api-inference.huggingface.co/models/${HF_MODEL}/v1/chat/completions`,
+    'https://api.groq.com/openai/v1/chat/completions',
     {
-      model: HF_MODEL,
+      model: GROQ_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -117,22 +116,21 @@ async function callHuggingFace(systemPrompt, userPrompt) {
     },
     {
       headers: {
-        Authorization: `Bearer ${HF_TOKEN}`,
+        Authorization: `Bearer ${GROQ_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      timeout: 90000,
+      timeout: 60000,
     }
   );
 
-  // Chat completions format: choices[0].message.content
   const text = response.data?.choices?.[0]?.message?.content || '';
-  if (!text.trim()) throw new Error('HuggingFace returned empty response');
+  if (!text.trim()) throw new Error('Groq returned empty response');
   return text;
 }
 
 /**
  * Main entry point.
- * Priority: Ollama → HuggingFace → static fallback
+ * Priority: Ollama → Groq → static fallback
  *
  * @param {string}   userMessage
  * @param {object[]} publications
@@ -153,13 +151,13 @@ async function synthesize(userMessage, publications, trials, history = [], conte
     console.warn('[llm] Ollama unavailable:', err.message);
   }
 
-  // ── Tier 2: HuggingFace ────────────────────────────────────────────────────
+  // ── Tier 2: Groq ───────────────────────────────────────────────────────────
   try {
-    const text = await callHuggingFace(systemPrompt, userPrompt);
-    console.log('[llm] Response from HuggingFace');
+    const text = await callGroq(systemPrompt, userPrompt);
+    console.log('[llm] Response from Groq');
     return text;
   } catch (err) {
-    console.warn('[llm] HuggingFace unavailable:', err.message);
+    console.warn('[llm] Groq unavailable:', err.message);
   }
 
   // ── Tier 3: Static fallback ────────────────────────────────────────────────
@@ -169,7 +167,7 @@ async function synthesize(userMessage, publications, trials, history = [], conte
 
 /**
  * Static fallback — structured response built directly from ranked data.
- * Used only when both Ollama and HuggingFace are unreachable.
+ * Used only when both Ollama and Groq are unreachable.
  */
 function generateFallbackResponse(query, publications, trials, disease) {
   const pubList = publications
