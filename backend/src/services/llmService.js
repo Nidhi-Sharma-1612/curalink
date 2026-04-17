@@ -4,7 +4,7 @@ const OLLAMA_URL  = process.env.OLLAMA_URL  || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
-const GROQ_MODEL   = process.env.GROQ_MODEL   || 'llama3-8b-8192';
+const GROQ_MODEL   = process.env.GROQ_MODEL   || 'llama-3.3-70b-versatile';
 
 /**
  * Builds the shared system + user prompts used by all LLM backends.
