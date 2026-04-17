@@ -148,7 +148,7 @@ NCBI_API_KEY=your_ncbi_api_key_here
 
 # Groq (production LLM — Tier 2)
 GROQ_API_KEY=gsk_your_groq_key_here
-GROQ_MODEL=llama3-8b-8192
+GROQ_MODEL=llama-3.3-70b-versatile
 
 ```
 
@@ -182,7 +182,7 @@ The Vite dev server proxies `/api` → `localhost:5000` automatically — no COR
 | `NCBI_EMAIL`        | Yes      | Email for NCBI API identification (mandatory per NCBI policy)                  |
 | `NCBI_API_KEY`      | No       | Raises PubMed rate limit from 3 to 10 req/s (free at ncbi.nlm.nih.gov/account) |
 | `GROQ_API_KEY`      | Yes\*    | Groq API key — production LLM (free at console.groq.com)                       |
-| `GROQ_MODEL`        | No       | Groq model (default: `llama3-8b-8192`)                                         |
+| `GROQ_MODEL`        | No       | Groq model (default: `llama-3.3-70b-versatile`)                                |
 
 \*Required if Ollama is not running (i.e., in any hosted environment).
 
