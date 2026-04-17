@@ -51,8 +51,9 @@ router.post('/chat', async (req, res) => {
     const effectiveName = session.context.patientName || patientName;
 
     // ── 2. Query expansion ─────────────────────────────────────────────────
+    const recentHistory = session.messages.slice(-8); // last 4 turns for context
     console.log(`[chat] Expanding query: "${message}" | disease: ${effectiveDisease}`);
-    const expandedQueries = await expandQuery(message, effectiveDisease, effectiveLocation);
+    const expandedQueries = await expandQuery(message, effectiveDisease, effectiveLocation, recentHistory);
     console.log('[chat] Expanded queries:', expandedQueries);
 
     // Tokenise for ranking
@@ -99,7 +100,6 @@ router.post('/chat', async (req, res) => {
     console.log(`[chat] After ranking: pubs=${topPublications.length}, trials=${topTrials.length}`);
 
     // ── 5. LLM synthesis ───────────────────────────────────────────────────
-    const recentHistory = session.messages.slice(-8); // last 4 turns
     const responseText = await synthesize(
       message,
       topPublications,
