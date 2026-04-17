@@ -73,15 +73,21 @@ function rankTrials(trials, queryTerms, topN = 6, primaryDisease = '') {
 
     const boost = statusBoost[(t.status || '').toUpperCase()] || 0;
 
-    // If the trial has conditions populated, require all primary disease words
-    // to appear in conditions — otherwise apply a 0.25× penalty to push
-    // off-topic trials (e.g. breast cancer in a lung cancer query) to the bottom.
+    // If the trial has conditions populated, check relevance to the query disease.
+    // - With a primaryDisease: require all disease words to appear in conditions.
+    // - Without one: require at least 2 query terms to match conditions.
+    // Either way, off-topic trials get a 0.25× penalty.
     let conditionPenalty = 1.0;
-    if (primaryDisease && t.conditions && t.conditions.length > 0) {
+    if (t.conditions && t.conditions.length > 0) {
       const condText = t.conditions.toLowerCase();
-      const diseaseWords = primaryDisease.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
-      const allMatch = diseaseWords.length > 0 && diseaseWords.every((w) => condText.includes(w));
-      if (!allMatch) conditionPenalty = 0.25;
+      if (primaryDisease) {
+        const diseaseWords = primaryDisease.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+        const allMatch = diseaseWords.length > 0 && diseaseWords.every((w) => condText.includes(w));
+        if (!allMatch) conditionPenalty = 0.25;
+      } else if (queryTerms && queryTerms.length > 0) {
+        const termMatches = queryTerms.filter((term) => condText.includes(term.toLowerCase())).length;
+        if (termMatches < 2) conditionPenalty = 0.25;
+      }
     }
 
     return { ...t, _score: (rel + boost) * conditionPenalty };
