@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import ChatWindow from './components/ChatWindow';
 import InputPanel from './components/InputPanel';
-import { sendMessage } from './services/api';
+import { sendMessage, getSession, clearSession } from './services/api';
 import './index.css';
 
 const SESSION_KEY = 'curalink_session_id';
@@ -14,6 +14,26 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Restore conversation history on mount (or when sessionId changes)
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    getSession(sessionId)
+      .then((session) => {
+        if (cancelled) return;
+        const restored = (session.messages || []).map((m) => ({
+          role: m.role,
+          content: m.content,
+          research: m.research || null,
+        }));
+        setMessages(restored);
+      })
+      .catch(() => {
+        // Session doesn't exist yet — start fresh, no error shown
+      });
+    return () => { cancelled = true; };
+  }, [sessionId]);
 
   const handleSubmit = useCallback(async ({ message, disease, patientName, location }) => {
     if (loading) return;
@@ -47,6 +67,7 @@ export default function App() {
   }, [sessionId, loading]);
 
   function handleNewSession() {
+    clearSession(sessionId).catch(() => {});
     const newId = uuidv4();
     setSessionId(newId);
     localStorage.setItem(SESSION_KEY, newId);

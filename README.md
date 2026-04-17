@@ -249,7 +249,7 @@ Response:
 | `ResearchCard`  | Publication card — title, source badge, year, authors, abstract snippet, external link (opens in new tab).                                       |
 | `TrialCard`     | Trial card — title, NCT ID, color-coded status badge, phase, summary, locations, external link.                                                  |
 
-Session ID is stored in `localStorage` and survives page refreshes. Click **+ New Chat** to start a fresh session.
+Session ID is stored in `localStorage`. On page refresh, the full conversation history is restored from MongoDB. Click **+ New Chat** to delete the current session and start fresh.
 
 ---
 
